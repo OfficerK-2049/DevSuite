@@ -1,6 +1,6 @@
-const { Pool } = require('pg');
-const config = require('../config/database.config');
-const logger = require('./logger');
+import {Pool} from 'pg'
+import config from '../config/database.config.js'
+import logger from './logger.js'
 
 const pool = new Pool(config);
 

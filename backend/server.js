@@ -1,13 +1,13 @@
-// import 'dotenv/config'
+import 'dotenv/config'
 import app from "./src/app.js";
-// import { connectDB } from "./src/utils/database";
+import { connectDB } from "./src/utils/database.js";
 import logger from "./src/utils/logger.js";
 
 const PORT=process.env.PORT || 3000;
 
 async function startServer(){
     try{
-        // await connectDB();
+        await connectDB();
         app.listen(PORT,()=>
         {
             logger.info(`DevSuite Listening on PORT : ${PORT}`)

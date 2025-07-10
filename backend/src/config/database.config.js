@@ -1,3 +1,8 @@
+
+
+console.log(process.env.DB_NAME)
+console.log(process.env.DB_USER)
+console.log(process.env.DB_PASSWORD)
 export default {
   host: process.env.DB_HOST || 'localhost',
   port: process.env.DB_PORT || 5432,

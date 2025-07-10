@@ -1,7 +1,7 @@
 {
-  "name": "backend",
+  "name": "devsuite",
   "version": "1.0.0",
-  "description": "",
+  "description": "Developer productivity tools REST API",
   "main": "server.js",
   "scripts": {
     "dev": "nodemon server.js",

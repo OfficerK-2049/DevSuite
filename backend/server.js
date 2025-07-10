@@ -1,24 +1,22 @@
-import express from 'express'
-const app=express()
+// import 'dotenv/config'
+import app from "./src/app.js";
+// import { connectDB } from "./src/utils/database";
+import logger from "./src/utils/logger.js";
 
+const PORT=process.env.PORT || 3000;
 
-app.get('/',(req,res)=>
-{
-    res.send("Welcome To DevSuite")
-})
+async function startServer(){
+    try{
+        // await connectDB();
+        app.listen(PORT,()=>
+        {
+            logger.info(`DevSuite Listening on PORT : ${PORT}`)
+        })
+    }
+    catch(err){
+        logger.error(`Server Crashed during start`,err)
+        process.exit(1)
+    }
+}
 
-
-
-
-
-
-
-
-
-
-
-
-app.listen(process.env.PORT || 2002,()=>
-{
-    console.log("Listening on port 2002")
-})
+startServer();

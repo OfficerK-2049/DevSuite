@@ -4,7 +4,7 @@ import cors from 'cors'
 import rateLimit from 'express-rate-limit'
 
 import routes from './routes/index.js'
-// import errorHandler from './middleware/errorHandler.middleware.js';
+import errorHandler from './middleware/errorHandler.middleware.js';
 import logger from './utils/logger.js'
 
 const app=express()
@@ -45,7 +45,7 @@ app.get('/health',(req,res)=>
     })
 })
 
-// app.use(errorHandler)
+app.use(errorHandler)
 
 //wildcard route handler
 app.get('*any',(req,res)=>

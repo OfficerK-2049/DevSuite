@@ -63,6 +63,9 @@ class URLShortenerController {
 
 module.exports = URLShortenerController;*/
 
+import URLShortenerService from "../services/urlShortener.service.js";
+import logger from "../utils/logger.js";
+
 //*errors propagate ; error responses are sent from there
 //?why don't we handle error responses from global middleware
 //?should I have a message property or no?
@@ -73,7 +76,7 @@ class URLShortenerController{
         try{
             const {originalUrl,expiresIn}=req.body;
             
-            const result=await URLShortenerService(originalUrl,expiresIn);
+            const result=await URLShortenerService.shortenUrl(originalUrl,expiresIn);
 
             res.status(201).json({
                 success:true,
@@ -116,7 +119,7 @@ class URLShortenerController{
     static async redirectToOriginal(req,res,next){
       try{
         const {shortId}=req.params;
-        const result=await URLShortenerService.redirectToOriginal(shortId)
+        const result=await URLShortenerService.getOriginalUrl(shortId)
 
         if(result.error){
           return res.status(result.statusCode).json({

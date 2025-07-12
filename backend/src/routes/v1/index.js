@@ -3,7 +3,7 @@ import urlShortenerRoutes from './urlShortener.routes.js'
 
 const router=express.Router()
 
-router.use('/',urlShortenerRoutes)
+router.use('/url',urlShortenerRoutes)
 
 
 export default router

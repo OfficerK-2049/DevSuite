@@ -74,7 +74,9 @@ class URLShortenerService {
 
 module.exports = URLShortenerService;*/
 
-
+import URLShortenerModel from "../models/urlShortener.model.js";
+import { parseExpiryTime } from "../utils/timeParser.js";
+import logger from "../utils/logger.js";
 
 class URLShortenerService{
     static async shortenUrl(originalUrl,expiresIn){
@@ -85,11 +87,11 @@ class URLShortenerService{
             logger.info(`URL shortened: ${originalUrl} -> ${urlRecord.short_id}`);
 
             return{
-                shortId:"urlRecord.short_id",
-                originalUrl:"urlRecord.original_url",
-                shortUrl:`${process.env.BASE_URL || 'http://localhost:3000'}/${urlRecord.short_id}`,
-                createdAt:"urlRecord.created_at",
-                expiresAt:"urlRecord.expires_at"
+                shortId:urlRecord.short_id,
+                originalUrl:urlRecord.original_url,
+                shortUrl:`${process.env.BASE_URL || 'http://localhost:3000'}/${process.env.V1_URL_MOUNT}/${urlRecord.short_id}`,
+                createdAt:urlRecord.created_at,
+                expiresAt:urlRecord.expires_at
                 
             }
         }
@@ -116,7 +118,7 @@ class URLShortenerService{
           createdAt:analytics.created_at,
           lastAccessed:analytics.last_accessed,
           expiresAt:analytics.expires_at,
-          iseExpired:analytics.expires_at? new Date > new Date (analytics.expires_at) : false
+          isExpired:analytics.expires_at? new Date > new Date (analytics.expires_at) : false
         }
 
       }

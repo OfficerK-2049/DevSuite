@@ -5,9 +5,13 @@ import rateLimit from 'express-rate-limit'
 
 import routes from './routes/index.js'
 import errorHandler from './middleware/errorHandler.middleware.js';
+import requestLatencyMonitor from './middleware/latency.middleware.js'
 import logger from './utils/logger.js'
 
 const app=express()
+
+app.use(requestLatencyMonitor);
+
 
 //security middleware
 app.use(helmet())

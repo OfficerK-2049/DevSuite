@@ -18,7 +18,7 @@ const base64QuerySchema = Joi.object({
     .valid('encode', 'decode')
     .required()
     .messages({
-      'any.only': 'Operation must be either "encode" or "decode"',
+      'any.only': 'Operation must be either `encode` or `decode` ',
       'any.required': 'Operation parameter is required'
     })
 });
@@ -28,7 +28,7 @@ const urlQuerySchema = Joi.object({
     .valid('encode', 'decode')
     .required()
     .messages({
-      'any.only': 'Operation must be either "encode" or "decode"',
+      'any.only': 'Operation must be either `encode` or `decode` ',
       'any.required': 'Operation parameter is required'
     })
 });
@@ -38,7 +38,7 @@ const slugifyQuerySchema = Joi.object({
     .valid('hyphen', 'underscore')
     .default('hyphen')
     .messages({
-      'any.only': 'Separator must be either "hyphen" or "underscore"'
+      'any.only': 'Separator must be either `hyphen` or `underscore` '
     })
 });
 
@@ -57,7 +57,7 @@ const morseQuerySchema = Joi.object({
     .valid('encode', 'decode')
     .required()
     .messages({
-      'any.only': 'Operation must be either "encode" or "decode"',
+      'any.only': 'Operation must be either `encode` or `decode` ',
       'any.required': 'Operation parameter is required'
     })
 });

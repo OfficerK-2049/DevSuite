@@ -1,5 +1,5 @@
-import TextTransformService from "../services/textTransform.service";
-import logger from "../utils/logger";
+import TextTransformService from "../services/textTransform.service.js";
+import logger from "../utils/logger.js";
 
 class TextTransformController {
   static async base64Transform(req, res, next) {

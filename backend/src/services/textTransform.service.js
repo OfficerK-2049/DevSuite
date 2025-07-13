@@ -1,5 +1,5 @@
-import TextTransformers from "../utils/textTransformers";
-import logger from "../utils/logger";
+import TextTransformers from "../utils/textTransformers.js";
+import logger from "../utils/logger.js";
 
 class TextTransformService {
   static async base64Transform(input, operation) {

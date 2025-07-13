@@ -37,8 +37,9 @@ const validateQuery = (schema) => {
       });
     }
     
+    // req.query = value; //!req.query is read-only in newer versions of express
     // Replace query with validated and defaulted values
-    req.query = value;
+    Object.assign(req.query, value);
     next();
   };
 };

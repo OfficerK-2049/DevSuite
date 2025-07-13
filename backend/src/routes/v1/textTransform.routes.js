@@ -58,33 +58,34 @@ import {textInputSchema,
   slugifyQuerySchema,
   caseQuerySchema,
   morseQuerySchema} from '../../utils/textValidators.js'
+import TextTransformController from '../../controllers/textTransform.controller.js';
 
 const router=express.Router()
 
 router.post('/base64',
     validateQuery(base64QuerySchema),
     validateBody(textInputSchema),
-    textTransformController
+    TextTransformController.base64Transform
 );
 router.post('/url',
     validateQuery(urlQuerySchema),
     validateBody(textInputSchema),
-    textTransformController
+    TextTransformController.urlTransform
 );
 router.post('/slugify',
     validateQuery(slugifyQuerySchema),
     validateBody(textInputSchema),
-    textTransformController
+    TextTransformController.slugifyText
 );
 router.post('/case',
     validateQuery(caseQuerySchema),
     validateBody(textInputSchema),
-    textTransformController
+    TextTransformController.convertCase
 )
 router.post('/morse',
     validateQuery(morseQuerySchema),
     validateBody(textInputSchema),
-    textTransformController
+    TextTransformController.morseTransform
 )
 
-export default router
+export default router;

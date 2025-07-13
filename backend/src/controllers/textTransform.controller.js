@@ -1,5 +1,5 @@
-const TextTransformService = require('../services/textTransform.service');
-const logger = require('../utils/logger');
+import TextTransformService from "../services/textTransform.service";
+import logger from "../utils/logger";
 
 class TextTransformController {
   static async base64Transform(req, res, next) {
@@ -88,4 +88,4 @@ class TextTransformController {
   }
 }
 
-module.exports = TextTransformController;
+export default TextTransformController;

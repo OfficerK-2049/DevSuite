@@ -51,25 +51,40 @@ router.post('/morse',
 module.exports = router;*/
 
 import express from 'express'
+import { validateBody,validateQuery } from '../../middleware/validation.middleware.js';
+import {textInputSchema,
+  base64QuerySchema,
+  urlQuerySchema,
+  slugifyQuerySchema,
+  caseQuerySchema,
+  morseQuerySchema} from '../../utils/textValidators.js'
 
 const router=express.Router()
 
 router.post('/base64',
     validateQuery(base64QuerySchema),
-    validate(textInputSchema),
-    textTransformController.base64Transform
+    validateBody(textInputSchema),
+    textTransformController
 );
 router.post('/url',
-    validateQuery(url4QuerySchema),
-    validate(textInputSchema),
-    textTransformController.urlTransform
+    validateQuery(urlQuerySchema),
+    validateBody(textInputSchema),
+    textTransformController
 );
 router.post('/slugify',
     validateQuery(slugifyQuerySchema),
-    validate(textInputSchema),
-    textTransformController.slugifyText
+    validateBody(textInputSchema),
+    textTransformController
 );
-router.post('/case')
-router.post('/morse')
+router.post('/case',
+    validateQuery(caseQuerySchema),
+    validateBody(textInputSchema),
+    textTransformController
+)
+router.post('/morse',
+    validateQuery(morseQuerySchema),
+    validateBody(textInputSchema),
+    textTransformController
+)
 
 export default router

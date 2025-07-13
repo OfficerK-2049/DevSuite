@@ -1,13 +1,13 @@
 import express from 'express'
 import URLShortenerController from '../../controllers/urlShortener.controller.js';
-import { validate,validateParams } from '../../middleware/validation.middleware.js';
-import { urlShortenSchema,shortIdSchema } from '../../utils/validators.js';
+import { validateBody,validateParams } from '../../middleware/validation.middleware.js';
+import { urlShortenSchema,shortIdSchema } from '../../utils/urlValidators.js';
 
 const router=express.Router()
 
 //json key's must always be quoted
 router.post('/shorten',
-  validate(urlShortenSchema),
+  validateBody(urlShortenSchema),
   URLShortenerController.shortenUrl
 );
 

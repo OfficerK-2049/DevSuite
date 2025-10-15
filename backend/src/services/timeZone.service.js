@@ -3,33 +3,12 @@ import { find as geoTzFind } from 'geo-tz';
 import { WebServiceClient } from '@maxmind/geoip2-node';
 import axios from 'axios';
 import { getTimeZones } from '@vvo/tzdb';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 
 import { isPrivateIP } from '../utils/ipLookup.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { getCountryCode } from '../utils/countryCodeMapper.js';
+import { getFeatureCodeRank } from '../utils/timeHeuristics.js';
 
 const MAXROWS=30;
-
-// Load country code mapping
-const countryMapping = {};
-try {
-  const countryData = fs.readFileSync(path.join(__dirname, '../../data/countryMapping.csv'), 'utf8');
-  const lines = countryData.split('\n');
-  
-  // Skip header
-  for (let i = 1; i < lines.length; i++) {
-    const parts = lines[i].split(',');
-    if (parts.length >= 2) {
-      countryMapping[parts[0].trim()] = parts[1].trim(); // Map country name to A2 code
-    }
-  }
-} catch (error) {
-  console.error('Error loading country mapping:', error);
-}
 
 // GeoNames API configuration
 const GEONAMES_USERNAME = process.env.GEONAMES_USERNAME || 'demo';
@@ -106,7 +85,7 @@ class TimeZoneService {
         city=city.replace(/-/g, ' ');
         country=country.replace(/-/g, ' ');
         try {
-          const countryCode = this.getCountryCode(country);
+          const countryCode = getCountryCode(country);
           if (!countryCode) {
             warning='Invalid country name';
             throw new Error('Invalid country name');
@@ -114,7 +93,7 @@ class TimeZoneService {
           
           const geonamesResponse = await axios.get(GEONAMES_API_URL, {
             params: {
-              name_equals: encodeURIComponent(city),
+              name_equals: city,
               country: countryCode,
               featureClass: 'P', // Populated places
               maxRows: MAXROWS,
@@ -129,7 +108,7 @@ class TimeZoneService {
             const results = geonamesResponse.data.geonames;
             const scoredResults = results.map(place => {
               // Calculate score based on population and feature code
-              const fcodeRank = this.getFeatureCodeRank(place.fcode);
+              const fcodeRank = getFeatureCodeRank(place.fcode);
               const population = place.population || 0;
               const geonamesScore=place.score || 0;
               const score = (population * 0.6) + (fcodeRank * 0.3) + (geonamesScore*0.1); //heuristics
@@ -152,11 +131,10 @@ class TimeZoneService {
       // 4. Try city-only lookup
       if (city && !ianaZoneId) {
         city=city.replace(/-/g, ' ');  //handle spaced params
-        console.log("City :",city)
         try {
           const geonamesResponse = await axios.get(GEONAMES_API_URL, {
             params: {
-              name_equals: encodeURIComponent(city),
+              name_equals: city,
               featureClass: 'P', // Populated places
               maxRows: MAXROWS,
               orderby: 'population',
@@ -186,7 +164,7 @@ class TimeZoneService {
       if (country && !ianaZoneId) {
         country=country.replace(/-/g, ' ');
         try {
-          const countryCode = this.getCountryCode(country);
+          const countryCode = getCountryCode(country);
           if (!countryCode) {
             throw new Error('Invalid country name');
           }
@@ -216,18 +194,23 @@ class TimeZoneService {
       }
 
       // If no timezone found, default to UTC
-      if (!warning && !ianaZoneId) {
+      if (!ianaZoneId) {
         ianaZoneId = 'UTC';
         source = 'Default';
-        warning = 'Could not determine timezone from provided parameters; defaulted to UTC.';
+        if(!warning){
+          warning = 'Could not determine timezone from provided parameters; defaulted to UTC.';
+        }
       }
 
       // Validate IANA ID
       const targetZone = IANAZone.create(ianaZoneId);
-      if (!warning && !targetZone.isValid) {
+      if (!targetZone.isValid) {
         ianaZoneId = 'UTC';
         source = 'Default (Invalid IANA ID)';
-        warning = 'Invalid IANA timezone ID; defaulted to UTC.';
+        if(!warning){
+          warning = 'Invalid IANA timezone ID; defaulted to UTC.';
+        }
+        
       }
 
       // Get current UTC time
@@ -278,12 +261,14 @@ class TimeZoneService {
     try {
       const results = [];
       let foundBy = '';
+      let warning=''
 
-      // 1. Try IP-based lookup
+      // 1.IP-based lookup
       if (ip) {
         try {
           // Validate IP is not private/reserved
           if (isPrivateIP(ip)) {
+            //TODO : no warning set
             throw new Error('IP address is private/reserved and cannot be geolocated.');
           }
           
@@ -295,7 +280,6 @@ class TimeZoneService {
               foundBy = 'IP Geolocation';
             }
           } else {
-            // Fallback if MaxMind credentials not available
             throw new Error('MaxMind credentials not configured');
           }
         } catch (error) {
@@ -311,13 +295,19 @@ class TimeZoneService {
           const lonNum = parseFloat(lon);
           
           if (isNaN(latNum) || isNaN(lonNum) || latNum < -90 || latNum > 90 || lonNum < -180 || lonNum > 180) {
+            //TODO : no warnings
             throw new Error('Invalid coordinates');
           }
           
           const zones = geoTzFind(latNum, lonNum);
           if (zones && zones.length > 0) {
-            const ianaId = zones[0];
-            results.push(await this.getTimeZoneMetadata(ianaId, referenceDate, 'Coordinate Lookup'));
+            const ianaIds = zones;
+            //TODO : no warnings - time zone metadata defaults to the first zone
+            for(const ianaId of ianaIds)
+            {
+              const metadata = await this.getTimeZoneMetadata(ianaId, referenceDate, 'Coordinate Lookup');
+              results.push(metadata);
+            }
             foundBy = 'Coordinate Lookup';
           } else {
             // Handle unassigned areas (ocean)
@@ -335,8 +325,9 @@ class TimeZoneService {
       // 3. Try city and country lookup
       if (city && country && results.length === 0) {
         try {
-          const countryCode = this.getCountryCode(country);
+          const countryCode = getCountryCode(country);
           if (!countryCode) {
+            //TODO : no warnings
             throw new Error('Invalid country name');
           }
           
@@ -345,7 +336,9 @@ class TimeZoneService {
               name_equals: city,
               country: countryCode,
               featureClass: 'P', // Populated places
-              maxRows: 10,
+              maxRows: MAXROWS,
+              type:'json',
+              style:'FULL', 
               username: GEONAMES_USERNAME
             }
           });
@@ -355,9 +348,10 @@ class TimeZoneService {
             const geoResults = geonamesResponse.data.geonames;
             const scoredResults = geoResults.map(place => {
               // Calculate score based on population and feature code
-              const fcodeRank = this.getFeatureCodeRank(place.fcode);
+              const fcodeRank = getFeatureCodeRank(place.fcode);
               const population = place.population || 0;
-              const score = (population * 0.6) + (fcodeRank * 0.4);
+              const geonamesScore=place.score || 0;
+              const score = (population * 0.6) + (fcodeRank * 0.3) + (geonamesScore*0.1); //heuristics
               return { ...place, score };
             });
             
@@ -366,34 +360,27 @@ class TimeZoneService {
             
             // Get timezone for the highest scored place
             const topPlace = scoredResults[0];
-            const tzResponse = await axios.get(`http://api.geonames.org/timezoneJSON`, {
-              params: {
-                lat: topPlace.lat,
-                lng: topPlace.lng,
-                username: GEONAMES_USERNAME
-              }
-            });
-            
-            if (tzResponse.data && tzResponse.data.timezoneId) {
-              const ianaId = tzResponse.data.timezoneId;
-              results.push(await this.getTimeZoneMetadata(ianaId, referenceDate, 'City + Country Lookup (Highest Population)'));
-              foundBy = 'City + Country Lookup (Highest Population)';
-            }
+            const ianaId = topPlace.timezone.timeZoneId;
+            results.push(await this.getTimeZoneMetadata(ianaId, referenceDate, 'City + Country Lookup (Highest Population)'));
+            foundBy = 'City + Country Lookup (Highest Population)';
+
           }
         } catch (error) {
           console.error('City/country lookup error:', error.message);
         }
       }
-
       // 4. Try city-only lookup
       if (city && results.length === 0) {
+        city=city.replace(/-/g, ' '); 
         try {
           const geonamesResponse = await axios.get(GEONAMES_API_URL, {
             params: {
               name_equals: city,
               featureClass: 'P', // Populated places
-              maxRows: 10,
+              maxRows: MAXROWS,
               orderby: 'population',
+              type:'json',
+              style:'FULL', 
               username: GEONAMES_USERNAME
             }
           });
@@ -401,21 +388,12 @@ class TimeZoneService {
           if (geonamesResponse.data.totalResultsCount > 0) {
             // Get the most populated place
             const topPlace = geonamesResponse.data.geonames[0];
-            
-            const tzResponse = await axios.get(`http://api.geonames.org/timezoneJSON`, {
-              params: {
-                lat: topPlace.lat,
-                lng: topPlace.lng,
-                username: GEONAMES_USERNAME
-              }
-            });
-            
-            if (tzResponse.data && tzResponse.data.timezoneId) {
-              const ianaId = tzResponse.data.timezoneId;
-              results.push(await this.getTimeZoneMetadata(ianaId, referenceDate, 'City Lookup (Highest Population)'));
-              foundBy = 'City Lookup (Highest Population)';
-            }
+            const ianaId = topPlace.timezone.timeZoneId;
+            results.push(await this.getTimeZoneMetadata(ianaId, referenceDate, 'City Lookup (Highest Population)'));
+            foundBy = 'City Lookup (Highest Population)';
+
           } else {
+            warning='City not found or is too small to be indexed.';
             throw new Error('City not found or is too small to be indexed.');
           }
         } catch (error) {
@@ -426,8 +404,9 @@ class TimeZoneService {
       // 5. Try country-only lookup
       if (country && results.length === 0) {
         try {
-          const countryCode = this.getCountryCode(country);
+          const countryCode = getCountryCode(country);
           if (!countryCode) {
+            //TODO : no warnings
             throw new Error('Invalid country name');
           }
           
@@ -460,7 +439,13 @@ class TimeZoneService {
 
       // If no results, return error
       if (results.length === 0) {
-        throw new Error('Could not determine timezone from provided parameters');
+        //!I guess there's no point in returning any other data
+        return{
+          success:'false',
+          message:'Could not determine timezone from provided parameters',
+          warning
+        }
+        // throw new Error('Could not determine timezone from provided parameters'); !do NOT throw explicit errors in fina try-catch unless you want to expose it to the user
       }
 
       return {
@@ -480,6 +465,7 @@ class TimeZoneService {
       // Validate IANA ID
       const targetZone = IANAZone.create(ianaId);
       if (!targetZone.isValid) {
+        //TODO : no warnings
         throw new Error('Invalid IANA timezone ID');
       }
 
@@ -496,32 +482,14 @@ class TimeZoneService {
           abbreviation: refDate.offsetNameShort,
           isCurrentlyDST: refDate.isInDST,
           dstNameLong: this.getTimeZoneLongName(ianaId)
-        }
+        },
+        warning
       };
     } catch (error) {
       throw new Error(`Error getting timezone metadata: ${error.message}`);
     }
   }
 
-
-  static getCountryCode(countryName) {
-    return countryMapping[countryName] || null;  // ISO 3166-1 alpha-2 country code
-  }
-
-
-  static getFeatureCodeRank(fcode) {
-    const fcodeRanks = {
-      'PPLC': 100, // Capital
-      'PPLA': 80,  // Administrative division
-      'PPLA2': 70,
-      'PPLA3': 60,
-      'PPLA4': 50,
-      'PPL': 40,   // Populated place
-      'PPLX': 30   // Section of populated place
-    };
-    
-    return fcodeRanks[fcode] || 0;
-  }
 
   static getTimeZoneLongName(ianaId) {
     try {

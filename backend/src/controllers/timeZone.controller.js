@@ -30,6 +30,7 @@ class TimeZoneController {
       // Validate that at least one location identifier is provided
       if (!city && !country && !lat && !lon && !ip) {
         return res.status(400).json({
+          success:'false',
           status: 'error',
           message: 'At least one location identifier (city, country, lat/lon, or ip) must be provided'
         });

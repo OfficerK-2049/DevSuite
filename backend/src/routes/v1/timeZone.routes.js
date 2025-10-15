@@ -1,5 +1,6 @@
 import express from 'express';
 import TimeZoneController from '../../controllers/timeZone.controller.js';
+//validators
 
 const router = express.Router();
 

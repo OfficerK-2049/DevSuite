@@ -12,12 +12,12 @@ import { isPrivateIP } from '../utils/ipLookup.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const MAXROWS=50;
+const MAXROWS=30;
 
 // Load country code mapping
 const countryMapping = {};
 try {
-  const countryData = fs.readFileSync(path.join(__dirname, '../utils/countryMapping.csv'), 'utf8');
+  const countryData = fs.readFileSync(path.join(__dirname, '../../data/countryMapping.csv'), 'utf8');
   const lines = countryData.split('\n');
   
   // Skip header
@@ -51,6 +51,7 @@ class TimeZoneService {
       let source = '';
       let warning = null;
 
+     //!wtf is the use of ianaId in conditional?
       // 1.IP-based lookup
       if (ip && !ianaZoneId) {
         try {
@@ -101,15 +102,18 @@ class TimeZoneService {
 
       // 3.city and country lookup
       if (city && country && !ianaZoneId) {
+        city=city.replace(/-/g, ' ');
+        country=country.replace(/-/g, ' ');
         try {
           const countryCode = this.getCountryCode(country);
           if (!countryCode) {
+            warning='Invalid country name';
             throw new Error('Invalid country name');
           }
           
           const geonamesResponse = await axios.get(GEONAMES_API_URL, {
             params: {
-              name_equals: city,
+              name_equals: encodeURIComponent(city),
               country: countryCode,
               featureClass: 'P', // Populated places
               maxRows: MAXROWS,
@@ -136,7 +140,7 @@ class TimeZoneService {
             
             // Get timezone for the highest scored place
             const topPlace = scoredResults[0];
-            ianaZoneId = topPlace.timezone.timezoneId;
+            ianaZoneId = topPlace.timezone.timeZoneId;
             source = 'GeoNames API (City/Country Lookup)';
           }
         } catch (error) {
@@ -146,10 +150,12 @@ class TimeZoneService {
 
       // 4. Try city-only lookup
       if (city && !ianaZoneId) {
+        city=city.replace(/-/g, ' ');  //handle spaced params
+        console.log("City :",city)
         try {
           const geonamesResponse = await axios.get(GEONAMES_API_URL, {
             params: {
-              name_equals: city,
+              name_equals: encodeURIComponent(city),
               featureClass: 'P', // Populated places
               maxRows: MAXROWS,
               orderby: 'population',
@@ -162,10 +168,12 @@ class TimeZoneService {
           if (geonamesResponse.data.totalResultsCount > 0) {
             // Get the most populated place
             const topPlace = geonamesResponse.data.geonames[0];
-            ianaZoneId = topPlace.timezone.timezoneId;
+            
+            ianaZoneId = topPlace.timezone.timeZoneId;
             source = 'GeoNames API (City Lookup)';
 
           } else {
+            warning='City not found or is too small to be indexed.'
             throw new Error('City not found or is too small to be indexed.');
           }
         } catch (error) {
@@ -175,6 +183,7 @@ class TimeZoneService {
 
       // 5. Try country-only lookup
       if (country && !ianaZoneId) {
+        country=country.replace(/-/g, ' ');
         try {
           const countryCode = this.getCountryCode(country);
           if (!countryCode) {
@@ -196,7 +205,7 @@ class TimeZoneService {
           if (geonamesResponse.data.totalResultsCount > 0) {
 
             const topPlace = geonamesResponse.data.geonames[0];
-            ianaZoneId = topPlace.timezone.timezoneId;
+            ianaZoneId = topPlace.timezone.timeZoneId;
             source = 'GeoNames API (Country Lookup)';
             
           }
@@ -206,7 +215,7 @@ class TimeZoneService {
       }
 
       // If no timezone found, default to UTC
-      if (!ip && !ianaZoneId) {
+      if (!warning && !ianaZoneId) {
         ianaZoneId = 'UTC';
         source = 'Default';
         warning = 'Could not determine timezone from provided parameters; defaulted to UTC.';
@@ -214,7 +223,7 @@ class TimeZoneService {
 
       // Validate IANA ID
       const targetZone = IANAZone.create(ianaZoneId);
-      if (!ip && !targetZone.isValid) {
+      if (!warning && !targetZone.isValid) {
         ianaZoneId = 'UTC';
         source = 'Default (Invalid IANA ID)';
         warning = 'Invalid IANA timezone ID; defaulted to UTC.';

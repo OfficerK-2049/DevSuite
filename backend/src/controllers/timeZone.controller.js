@@ -3,17 +3,18 @@ import TimeZoneService from '../services/timeZone.service.js';
 class TimeZoneController {
   static async getCurrentTime(req, res, next) {
     try {
-      const { city, country, lat, lon, ip, format } = req.query;
+      const { city, country, lat, lon, ip } = req.query;
       
       // Validate that at least one location identifier is provided
       if (!city && !country && !lat && !lon && !ip) {
         return res.status(400).json({
+          success:'false',
           status: 'error',
           message: 'At least one location identifier (city, country, lat/lon, or ip) must be provided'
         });
       }
       
-      const result = await TimeZoneService.getCurrentTime({ city, country, lat, lon, ip, format });
+      const result = await TimeZoneService.getCurrentTime({ city, country, lat, lon, ip });
       
       res.json(result);
     } catch (error) {

@@ -82,6 +82,7 @@ class TimeZoneService {
           const lonNum = parseFloat(lon);
           
           if (isNaN(latNum) || isNaN(lonNum) || latNum < -90 || latNum > 90 || lonNum < -180 || lonNum > 180) {
+            warning='Invalid coordinates';
             throw new Error('Invalid coordinates');
           }
           

@@ -7,7 +7,8 @@ import { getTimeZones } from '@vvo/tzdb';
 
 import { isPrivateIP } from '../utils/ipUtils.js';
 import { getCountryCode } from '../utils/countryCodeMapper.js';
-import { getFeatureCodeRank } from '../utils/timeHeuristics.js';
+import { getFeatureCodeRank } from '../utils/timeUtils.js';
+import { getTimeZoneMetadata,getTimeZoneLongName } from '../utils/timeUtils.js';
 import { serializeParams } from '../utils/serialize.js';
 const MAXROWS=30;
 
@@ -233,7 +234,7 @@ class TimeZoneService {
             offsetMinutes: convertedTime.offset,
             offsetString: convertedTime.toFormat('ZZZZ'),
             abbreviation: convertedTime.offsetNameShort,
-            longName: this.getTimeZoneLongName(convertedTime.zone.name),
+            longName: getTimeZoneLongName(convertedTime.zone.name),
             isDaylightSaving: convertedTime.isInDST,
             zoneType: 'iana'
           },
@@ -270,7 +271,6 @@ class TimeZoneService {
 
       // 1.IP-based lookup
       if (ip) {
-        //TODO add invalid/malformed IP check
         try {
           // Validate IP is not private/reserved
           if (isPrivateIP(ip)) {
@@ -282,7 +282,7 @@ class TimeZoneService {
             const response = await maxmindClient.city(ip);
             if (response.location && response.location.timeZone) {
               const ianaId = response.location.timeZone;
-              results.push(await this.getTimeZoneMetadata(ianaId, referenceDate, 'IP Geolocation'));
+              results.push(await getTimeZoneMetadata(ianaId, referenceDate, 'IP Geolocation'));
               foundBy = 'IP Geolocation';
             }
           } else {
@@ -293,32 +293,30 @@ class TimeZoneService {
         }
       }
 
-      // 2. Try coordinate-based lookup
+      // 2.coordinate-based lookup
       if (lat && lon && results.length === 0) {
         try {
-          // Validate coordinates
           const latNum = parseFloat(lat);
           const lonNum = parseFloat(lon);
           
           if (isNaN(latNum) || isNaN(lonNum) || latNum < -90 || latNum > 90 || lonNum < -180 || lonNum > 180) {
-            //TODO : no warnings
+            warning='Invalid coordinates';
             throw new Error('Invalid coordinates');
           }
           
           const zones = geoTzFind(latNum, lonNum);
           if (zones && zones.length > 0) {
             const ianaIds = zones;
-            //TODO : no warnings - time zone metadata defaults to the first zone
             for(const ianaId of ianaIds)
             {
-              const metadata = await this.getTimeZoneMetadata(ianaId, referenceDate, 'Coordinate Lookup');
+              const metadata = await getTimeZoneMetadata(ianaId, referenceDate, 'Coordinate Lookup');
               results.push(metadata);
             }
             foundBy = 'Coordinate Lookup';
           } else {
             // Handle unassigned areas (ocean)
             const ianaId = 'Etc/GMT';
-            const metadata = await this.getTimeZoneMetadata(ianaId, referenceDate, 'Coordinate Lookup (Default)');
+            const metadata = await getTimeZoneMetadata(ianaId, referenceDate, 'Coordinate Lookup (Default)');
             warning = 'Coordinates are in international waters; time zone defaulted to UTC (GMT+00:00).';
             results.push(metadata);
             foundBy = 'Coordinate Lookup (Default)';
@@ -369,7 +367,7 @@ class TimeZoneService {
             // Get timezone for the highest scored place
             const topPlace = scoredResults[0];
             const ianaId = topPlace.timezone.timeZoneId;
-            results.push(await this.getTimeZoneMetadata(ianaId, referenceDate, 'City + Country Lookup (Highest Population)'));
+            results.push(await getTimeZoneMetadata(ianaId, referenceDate, 'City + Country Lookup (Highest Population)'));
             foundBy = 'City + Country Lookup (Highest Population)';
 
           }
@@ -398,7 +396,7 @@ class TimeZoneService {
             // Get the most populated place
             const topPlace = geonamesResponse.data.geonames[0];
             const ianaId = topPlace.timezone.timeZoneId;
-            results.push(await this.getTimeZoneMetadata(ianaId, referenceDate, 'City Lookup (Highest Population)'));
+            results.push(await getTimeZoneMetadata(ianaId, referenceDate, 'City Lookup (Highest Population)'));
             foundBy = 'City Lookup (Highest Population)';
 
           } else {
@@ -436,7 +434,7 @@ class TimeZoneService {
           // Get metadata for each unique zone
           for (const tz of uniqueZoneObjects) {
             console.log("Am I running?")
-            const metadata = await this.getTimeZoneMetadata(tz.name, referenceDate, 'Country Lookup',warning);
+            const metadata = await getTimeZoneMetadata(tz.name, referenceDate, 'Country Lookup',warning);
             console.log("Meta : ",metadata)
             results.push(metadata);
           }
@@ -471,46 +469,6 @@ class TimeZoneService {
     }
   }
 
-
-  static async getTimeZoneMetadata(ianaId, referenceDate, foundBy,warning) {
-    try {
-      // Validate IANA ID
-      const targetZone = IANAZone.create(ianaId);
-      if (!targetZone.isValid) {
-        warning='Invalid IANA timezone ID';
-        throw new Error('Invalid IANA timezone ID');
-      }
-
-      // Create DateTime object for the reference date at noon (to avoid DST transition issues)
-      const refDate = DateTime.fromISO(`${referenceDate}T12:00:00`, { zone: ianaId });
-      
-      return {
-        ianaId,
-        foundBy,
-        metadataAtDate: {
-          date: referenceDate,
-          utcOffsetMinutes: refDate.offset,
-          offsetString: refDate.toFormat('ZZZZ'),
-          abbreviation: refDate.offsetNameShort,
-          isCurrentlyDST: refDate.isInDST,
-          dstNameLong: this.getTimeZoneLongName(ianaId)
-        },
-      };
-    } catch (error) {
-      throw new Error(`Error getting timezone metadata: ${error.message}`);
-    }
-  }
-
-
-  static getTimeZoneLongName(ianaId) {
-    try {
-      const allTimeZones = getTimeZones();
-      const zone = allTimeZones.find(tz => tz.name === ianaId);
-      return zone ? zone.alternativeName : ianaId.replace('_', ' ');
-    } catch (error) {
-      return ianaId.replace('_', ' ');
-    }
-  }
 
 }
 

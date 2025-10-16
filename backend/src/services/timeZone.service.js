@@ -313,7 +313,7 @@ class TimeZoneService {
             // Handle unassigned areas (ocean)
             const ianaId = 'Etc/GMT';
             const metadata = await this.getTimeZoneMetadata(ianaId, referenceDate, 'Coordinate Lookup (Default)');
-            metadata.warning = 'Coordinates are in international waters; time zone defaulted to UTC (GMT+00:00).';
+            warning = 'Coordinates are in international waters; time zone defaulted to UTC (GMT+00:00).';
             results.push(metadata);
             foundBy = 'Coordinate Lookup (Default)';
           }
@@ -369,7 +369,7 @@ class TimeZoneService {
           console.error('City/country lookup error:', error.message);
         }
       }
-      // 4. Try city-only lookup
+      // 4.city-only lookup
       if (city && results.length === 0) {
         city=city.replace(/-/g, ' '); 
         try {
@@ -403,23 +403,22 @@ class TimeZoneService {
 
       // 5. Try country-only lookup
       if (country && results.length === 0) {
+        country=country.replace(/-/g, ' '); 
         try {
           const countryCode = getCountryCode(country);
           if (!countryCode) {
-            //TODO : no warnings
+            warning='Invalid country name';
             throw new Error('Invalid country name');
           }
           
-          // For country-only, use @vvo/tzdb to get up to 5 unique IANA IDs
           const allTimeZones = getTimeZones();
           const countryTimeZones = allTimeZones.filter(tz => tz.countryCode === countryCode);
           
-          // Get unique IANA IDs
           const uniqueZones = new Set();
           const uniqueZoneObjects = [];
           
           for (const tz of countryTimeZones) {
-            if (!uniqueZones.has(tz.name) && uniqueZones.size < 5) {
+            if (!uniqueZones.has(tz.name)) {
               uniqueZones.add(tz.name);
               uniqueZoneObjects.push(tz);
             }
@@ -427,9 +426,12 @@ class TimeZoneService {
           
           // Get metadata for each unique zone
           for (const tz of uniqueZoneObjects) {
-            const metadata = await this.getTimeZoneMetadata(tz.name, referenceDate, 'Country Lookup');
+            console.log("Am I running?")
+            const metadata = await this.getTimeZoneMetadata(tz.name, referenceDate, 'Country Lookup',warning);
+            console.log("Meta : ",metadata)
             results.push(metadata);
           }
+          console.log("Final : ",results)
           
           foundBy = 'Country Lookup (Multiple Time Zones)';
         } catch (error) {
@@ -452,7 +454,8 @@ class TimeZoneService {
         status: 'success',
         queryTime: new Date().toISOString(),
         requestedReferenceDate: referenceDate,
-        results
+        results,
+        warning
       };
     } catch (error) {
       throw new Error(`Error looking up timezone: ${error.message}`);
@@ -460,12 +463,12 @@ class TimeZoneService {
   }
 
 
-  static async getTimeZoneMetadata(ianaId, referenceDate, foundBy) {
+  static async getTimeZoneMetadata(ianaId, referenceDate, foundBy,warning) {
     try {
       // Validate IANA ID
       const targetZone = IANAZone.create(ianaId);
       if (!targetZone.isValid) {
-        //TODO : no warnings
+        warning='Invalid IANA timezone ID';
         throw new Error('Invalid IANA timezone ID');
       }
 
@@ -483,7 +486,6 @@ class TimeZoneService {
           isCurrentlyDST: refDate.isInDST,
           dstNameLong: this.getTimeZoneLongName(ianaId)
         },
-        warning
       };
     } catch (error) {
       throw new Error(`Error getting timezone metadata: ${error.message}`);

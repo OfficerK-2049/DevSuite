@@ -4,10 +4,11 @@ import { WebServiceClient } from '@maxmind/geoip2-node';
 import axios from 'axios';
 import { getTimeZones } from '@vvo/tzdb';
 
+
 import { isPrivateIP } from '../utils/ipLookup.js';
 import { getCountryCode } from '../utils/countryCodeMapper.js';
 import { getFeatureCodeRank } from '../utils/timeHeuristics.js';
-
+import { serializeParams } from '../utils/serialize.js';
 const MAXROWS=30;
 
 // GeoNames API configuration
@@ -95,13 +96,15 @@ class TimeZoneService {
             params: {
               name_equals: city,
               country: countryCode,
-              featureClass: 'P', // Populated places
+              featureClass:['P','A'],
               maxRows: MAXROWS,
               type:'json',
               style:'FULL', 
               username: GEONAMES_USERNAME
-            }
-          });
+            },
+            paramsSerializer: serializeParams
+          }
+        );
           
           if (geonamesResponse.data.totalResultsCount > 0) {
             // Apply scoring heuristic for city+country
@@ -135,13 +138,14 @@ class TimeZoneService {
           const geonamesResponse = await axios.get(GEONAMES_API_URL, {
             params: {
               name_equals: city,
-              featureClass: 'P', // Populated places
+              featureClass:['P','A'],
               maxRows: MAXROWS,
               orderby: 'population',
               type:'json',
               style:'FULL', 
               username: GEONAMES_USERNAME
-            }
+            },
+            paramsSerializer: serializeParams
           });
           
           if (geonamesResponse.data.totalResultsCount > 0) {
@@ -172,13 +176,14 @@ class TimeZoneService {
           const geonamesResponse = await axios.get(GEONAMES_API_URL, {
             params: {
               country: countryCode,
-              featureClass: 'P', // Populated places
+              featureClass:['P','A'],
               maxRows: MAXROWS,
               orderby: 'population',
               type:'json',
               style:'FULL', 
               username: GEONAMES_USERNAME
-            }
+            },
+            paramsSerializer: serializeParams
           });
           
           if (geonamesResponse.data.totalResultsCount > 0) {
@@ -324,10 +329,12 @@ class TimeZoneService {
 
       // 3. Try city and country lookup
       if (city && country && results.length === 0) {
+        city=city.replace(/-/g, ' '); 
+        country=country.replace(/-/g, ' '); 
         try {
           const countryCode = getCountryCode(country);
           if (!countryCode) {
-            //TODO : no warnings
+            warning='Invalid country name';
             throw new Error('Invalid country name');
           }
           
@@ -335,19 +342,20 @@ class TimeZoneService {
             params: {
               name_equals: city,
               country: countryCode,
-              featureClass: 'P', // Populated places
+              featureClass:['P','A'],
               maxRows: MAXROWS,
               type:'json',
               style:'FULL', 
               username: GEONAMES_USERNAME
-            }
+            },
+            paramsSerializer: serializeParams
           });
           
           if (geonamesResponse.data.totalResultsCount > 0) {
-            // Apply scoring heuristic for city+country
+            console.log(geonamesResponse.data)
+
             const geoResults = geonamesResponse.data.geonames;
             const scoredResults = geoResults.map(place => {
-              // Calculate score based on population and feature code
               const fcodeRank = getFeatureCodeRank(place.fcode);
               const population = place.population || 0;
               const geonamesScore=place.score || 0;
@@ -376,13 +384,14 @@ class TimeZoneService {
           const geonamesResponse = await axios.get(GEONAMES_API_URL, {
             params: {
               name_equals: city,
-              featureClass: 'P', // Populated places
+              featureClass:['P','A'], // Populated places, Administrative places
               maxRows: MAXROWS,
               orderby: 'population',
               type:'json',
               style:'FULL', 
               username: GEONAMES_USERNAME
-            }
+            },
+            paramsSerializer: serializeParams
           });
           
           if (geonamesResponse.data.totalResultsCount > 0) {
@@ -401,7 +410,7 @@ class TimeZoneService {
         }
       }
 
-      // 5. Try country-only lookup
+      // 5.country-only lookup
       if (country && results.length === 0) {
         country=country.replace(/-/g, ' '); 
         try {

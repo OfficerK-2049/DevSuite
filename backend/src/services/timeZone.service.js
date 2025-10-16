@@ -5,7 +5,7 @@ import axios from 'axios';
 import { getTimeZones } from '@vvo/tzdb';
 
 
-import { isPrivateIP } from '../utils/ipLookup.js';
+import { isPrivateIP } from '../utils/ipUtils.js';
 import { getCountryCode } from '../utils/countryCodeMapper.js';
 import { getFeatureCodeRank } from '../utils/timeHeuristics.js';
 import { serializeParams } from '../utils/serialize.js';
@@ -270,10 +270,11 @@ class TimeZoneService {
 
       // 1.IP-based lookup
       if (ip) {
+        //TODO add invalid/malformed IP check
         try {
           // Validate IP is not private/reserved
           if (isPrivateIP(ip)) {
-            //TODO : no warning set
+            warning='IP address is private/reserved and cannot be geolocated.';
             throw new Error('IP address is private/reserved and cannot be geolocated.');
           }
           
@@ -352,7 +353,6 @@ class TimeZoneService {
           });
           
           if (geonamesResponse.data.totalResultsCount > 0) {
-            console.log(geonamesResponse.data)
 
             const geoResults = geonamesResponse.data.geonames;
             const scoredResults = geoResults.map(place => {

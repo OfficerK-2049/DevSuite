@@ -1,30 +1,16 @@
-
 import Joi from 'joi';
 
-const ipSchema = Joi.string()
+export const ipSchema = Joi.string()
     .ip({
         version: ['ipv4', 'ipv6'],
         cidr: 'optional' // CIDR notation (e.g., /24) is optional
     })
-    .required()
     .messages({
         // Custom messages for clearer client feedback
         'string.ip': 'The provided IP address is malformed or invalid.',
         'any.required': 'IP address is required for this lookup type.'
     });
 
-export function validateIp(ip) {
-    const { error } = ipSchema.validate(ip);
-    
-    if (error) {
-        // Return a structured error object
-        return {
-            message: `Validation Error: ${error.details[0].message}`,
-            statusCode: 400 
-        };
-    }
-    return null;
-}
 
 export function isPrivateIP(ip) {
     // Simple check for private/reserved IPs

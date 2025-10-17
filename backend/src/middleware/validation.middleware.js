@@ -1,4 +1,3 @@
-import { validateIp } from "../utils/ipUtils.js";
 
 const validateBody = (schema) => {
   return (req, res, next) => {
@@ -48,25 +47,19 @@ const validateQuery = (schema) => {
 
 
 
-const ipValidation=(req, res, next)=> {
-    const ip = req.query.ip;
-
-    if (ip) {
-        // If the IP parameter exists, run it through the Joi validator
-        const validationError = validateIp(ip);
-        
-        if (validationError) {
-            // Stop the request and send the error defined in the utility
-            return res.status(validationError.statusCode).json({
-                status: 'error',
-                code: 'MALFORMED_INPUT',
-                message: validationError.message
+const validateIp=(schema)=>{
+ return (req, res, next)=> {
+        const { error } = schema.validate(req.query.ip);
+        if (error) {
+            return res.status(400).json({
+                success: false,
+                message: 'Malformed input',
+                details: error.details.map(detail => detail.message)
             });
         }
-    }
-    // Proceed to the controller if validation passes or if 'ip' is not present
+
     next();
 }
+}
 
-
-export {validateBody,validateParams,validateQuery,ipValidation}
+export {validateBody,validateParams,validateQuery,validateIp}

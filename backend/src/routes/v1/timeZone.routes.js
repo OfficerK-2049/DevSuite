@@ -1,12 +1,17 @@
 import express from 'express';
 import TimeZoneController from '../../controllers/timeZone.controller.js'; 
-import { ipValidation } from '../../middleware/validation.middleware.js'; //TODO refactor ip validation logic to fit codebase
+import { ipSchema } from '../../utils/ipUtils.js';
+import { validateIp } from '../../middleware/validation.middleware.js'; //TODO done
 //validators
 
 const router = express.Router();
 
-router.get('/now',ipValidation,TimeZoneController.getCurrentTime);
+router.get('/now',
+    validateIp(ipSchema),
+    TimeZoneController.getCurrentTime);
 
-router.get('/lookup',ipValidation,TimeZoneController.lookupTimeZone);
+router.get('/lookup',
+    validateIp(ipSchema),
+    TimeZoneController.lookupTimeZone);
 
 export default router;

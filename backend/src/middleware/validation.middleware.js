@@ -53,7 +53,7 @@ const validateIp=(schema)=>{
         if (error) {
             return res.status(400).json({
                 success: false,
-                message: 'Malformed innnPUTTT',
+                message: 'Malformed Input',
                 details: error.details.map(detail => detail.message)
             });
         }

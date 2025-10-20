@@ -43,6 +43,26 @@ class TimeZoneController {
       next(error);
     }
   }
+  
+  static async convertTime(req, res, next) {
+  try {
+    const { dateTime, fromZone, toZone } = req.query;
+    const result = await TimeZoneService.convertTime({ dateTime, fromZone, toZone });
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+  static async formatTime(req, res, next) {
+  try {
+    const { dateTime, displayZone, format, locale } = req.query;
+    const result = await TimeZoneService.formatTime({ dateTime, displayZone, format, locale });
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+}
 }
 
 export default TimeZoneController;

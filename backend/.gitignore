@@ -25,6 +25,7 @@ coverage/
 .idea/
 *.swp
 *.swo
+data/prompt.txt
 
 # OS
 .DS_Store

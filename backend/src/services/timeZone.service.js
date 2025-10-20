@@ -468,8 +468,205 @@ class TimeZoneService {
       throw new Error(`Error looking up timezone: ${error.message}`);
     }
   }
+  static async convertTime({ dateTime, fromZone, toZone }) {
+  const warnings = [];
+  const audit = {
+    sourceInput: dateTime,
+    inputInterpretation: ''
+  };
+
+  // Check if dateTime has explicit offset
+  const offsetRegex = /[+-]\d{2}:\d{2}|Z$/;
+  const hasExplicitOffset = offsetRegex.test(dateTime);
+
+  let parsedDateTime;
+  let sourceZoneUsed = null;
+
+  // State determination logic
+  if (hasExplicitOffset && fromZone) {
+    // State A: Has offset + fromZone provided -> Ignore fromZone
+    warnings.push('fromZone was provided but ignored because the DateTime string included an explicit offset.');
+    parsedDateTime = DateTime.fromISO(dateTime);
+    audit.inputInterpretation = `Offset provided in string was used to define the moment (UTC: ${parsedDateTime.toUTC().toISO()}).`;
+  } else if (hasExplicitOffset && !fromZone) {
+    // State B: Has offset, no fromZone -> Use offset
+    parsedDateTime = DateTime.fromISO(dateTime);
+    audit.inputInterpretation = `Offset in DateTime string was used to define the moment.`;
+  } else if (!hasExplicitOffset && fromZone) {
+    // State C: No offset + fromZone -> Interpret as floating time in fromZone
+    parsedDateTime = DateTime.fromISO(dateTime, { zone: fromZone });
+    sourceZoneUsed = fromZone;
+    audit.inputInterpretation = `Floating time interpreted as originating in ${fromZone}.`;
+  } else {
+    // State D: No offset, no fromZone -> ERROR
+    throw {
+      statusCode: 400,
+      message: 'Ambiguous input: dateTime lacks an offset and fromZone was not provided. Cannot determine the moment in time.',
+      code: 'AMBIGUOUS_DATETIME'
+    };
+  }
+
+  // Validate parsed DateTime
+  //! shouldn't this be for the input datetime?
+  if (!parsedDateTime.isValid) {
+    throw {
+      statusCode: 400,
+      message: `Malformed dateTime: ${parsedDateTime.invalidReason}`,
+      code: 'INVALID_DATETIME'
+    };
+  }
+
+  // Check if time component exists
+  const hasTimeComponent = /T\d/.test(dateTime);
+  if (!hasTimeComponent) {
+    warnings.push('No time component detected in dateTime. Defaulted to midnight (00:00:00).');
+  }
+
+  // DST ambiguity check (only for State C with fromZone)
+  //!refactor - confusing
+  if (sourceZoneUsed) {
+    const possibleOffsets = parsedDateTime.zone.offset(parsedDateTime.toMillis());
+    const offsetCount = DateTime.fromMillis(parsedDateTime.toMillis(), { zone: sourceZoneUsed })
+      .set({ hour: parsedDateTime.hour, minute: parsedDateTime.minute })
+      .zone.offset(parsedDateTime.toMillis());
+    
+    // More accurate DST detection
+    const allPossible = [];
+    const testTime = parsedDateTime.set({ second: 0, millisecond: 0 });
+    
+    // Check hour before and after for ambiguity
+    for (let hourOffset = -1; hourOffset <= 1; hourOffset++) {
+      const test = testTime.plus({ hours: hourOffset });
+      if (test.hour === parsedDateTime.hour && test.minute === parsedDateTime.minute) {
+        allPossible.push(test);
+      }
+    }
+
+    if (allPossible.length === 2) {
+      warnings.push('Ambiguous time detected (DST fall back). The first occurrence was selected.');
+    } else if (allPossible.length === 0) {
+      warnings.push('Invalid time detected (DST spring forward). Luxon adjusted to the nearest valid time.');
+    }
+  }
+
+  // Convert to target zone
+  const convertedDateTime = parsedDateTime.setZone(toZone);
+
+  return {
+    status: 'success',
+    conversion: {
+      targetZone: toZone,
+      sourceZoneUsed: sourceZoneUsed,
+      utcTime: {
+        iso: parsedDateTime.toUTC().toISO(),
+        unixTimestampMs: parsedDateTime.toMillis()
+      },
+      result: {
+        iso: convertedDateTime.toISO(),
+        localWallTime: convertedDateTime.toFormat('hh:mm a'),
+        fullFormat: convertedDateTime.toFormat('MMMM d, yyyy \'at\' h:mm a ZZZZ'),
+        metadata: {
+          offsetMinutes: convertedDateTime.offset,
+          offsetString: convertedDateTime.toFormat('ZZ'),
+          abbreviation: convertedDateTime.offsetNameShort,
+          isDaylightSaving: convertedDateTime.isInDST
+        }
+      }
+    },
+    warnings,
+    audit
+  };
+}
+
+  static async formatTime({ dateTime, displayZone, format, locale }) {
+  // Luxon predefined format constants map
+  const LUXON_FORMAT_CONSTANTS = {
+    'DATE_SHORT': DateTime.DATE_SHORT,
+    'DATE_MED': DateTime.DATE_MED,
+    'DATE_MED_WITH_WEEKDAY': DateTime.DATE_MED_WITH_WEEKDAY,
+    'DATE_FULL': DateTime.DATE_FULL,
+    'DATE_HUGE': DateTime.DATE_HUGE,
+    'TIME_SIMPLE': DateTime.TIME_SIMPLE,
+    'TIME_WITH_SECONDS': DateTime.TIME_WITH_SECONDS,
+    'TIME_WITH_SHORT_OFFSET': DateTime.TIME_WITH_SHORT_OFFSET,
+    'TIME_WITH_LONG_OFFSET': DateTime.TIME_WITH_LONG_OFFSET,
+    'TIME_24_SIMPLE': DateTime.TIME_24_SIMPLE,
+    'TIME_24_WITH_SECONDS': DateTime.TIME_24_WITH_SECONDS,
+    'TIME_24_WITH_SHORT_OFFSET': DateTime.TIME_24_WITH_SHORT_OFFSET,
+    'TIME_24_WITH_LONG_OFFSET': DateTime.TIME_24_WITH_LONG_OFFSET,
+    'DATETIME_SHORT': DateTime.DATETIME_SHORT,
+    'DATETIME_MED': DateTime.DATETIME_MED,
+    'DATETIME_FULL': DateTime.DATETIME_FULL,
+    'DATETIME_HUGE': DateTime.DATETIME_HUGE,
+    'DATETIME_SHORT_WITH_SECONDS': DateTime.DATETIME_SHORT_WITH_SECONDS,
+    'DATETIME_MED_WITH_SECONDS': DateTime.DATETIME_MED_WITH_SECONDS,
+    'DATETIME_MED_WITH_WEEKDAY': DateTime.DATETIME_MED_WITH_WEEKDAY,
+    'DATETIME_FULL_WITH_SECONDS': DateTime.DATETIME_FULL_WITH_SECONDS,
+    'DATETIME_HUGE_WITH_SECONDS': DateTime.DATETIME_HUGE_WITH_SECONDS
+  };
+
+  // Parse the input dateTime
+  let parsedDateTime = DateTime.fromISO(dateTime);
+
+  // If no offset in dateTime, use displayZone for interpretation
+  const offsetRegex = /[+-]\d{2}:\d{2}|Z$/;
+  if (!offsetRegex.test(dateTime)) {
+    parsedDateTime = DateTime.fromISO(dateTime, { zone: displayZone });
+  } else {
+    // Has offset, convert to displayZone
+    parsedDateTime = parsedDateTime.setZone(displayZone);
+  }
+
+  if (!parsedDateTime.isValid) {
+    throw {
+      statusCode: 400,
+      message: `Malformed dateTime: ${parsedDateTime.invalidReason}`,
+      code: 'INVALID_DATETIME'
+    };
+  }
+
+  // Apply locale if provided
+  if (locale) {
+    parsedDateTime = parsedDateTime.setLocale(locale);
+  }
+
+  let formattedTime;
+  let requestedFormat = format;
+
+  try {
+    // Check if format is a predefined constant
+    if (LUXON_FORMAT_CONSTANTS[format]) {
+      formattedTime = parsedDateTime.toLocaleString(LUXON_FORMAT_CONSTANTS[format]);
+    } else {
+      // Custom format using toFormat
+      formattedTime = parsedDateTime.toFormat(format);
+    }
+  } catch (error) {
+    throw {
+      statusCode: 400,
+      message: `Invalid format string: ${error.message}`,
+      code: 'INVALID_FORMAT'
+    };
+  }
+
+  return {
+    status: 'success',
+    data: {
+      formattedTime,
+      requestedFormat,
+      metadata: {
+        ianaZoneId: parsedDateTime.zoneName,
+        appliedLocale: locale || 'en-US',
+        unixTimestampMs: parsedDateTime.toMillis(),
+        inputTimeParsed: parsedDateTime.toISO()
+      }
+    }
+  };
+}
 
 
 }
+
+
 
 export default TimeZoneService;

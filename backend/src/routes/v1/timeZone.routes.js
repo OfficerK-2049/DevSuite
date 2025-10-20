@@ -5,7 +5,7 @@ import { validateIp,validateQuery } from '../../middleware/validation.middleware
 import { convertSchema, formatSchema } from '../../utils/timeValidators.js';
 
 const router = express.Router();
-
+//TODO : refactor param validation for first two routes
 router.get('/now',
     validateIp(ipSchema),
     TimeZoneController.getCurrentTime);

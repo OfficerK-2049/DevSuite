@@ -1,4 +1,5 @@
 import Joi from 'joi';
+import { IANAZone } from 'luxon';
 
 // Common validation schema for location parameters
 const locationSchema = Joi.object({
@@ -50,3 +51,65 @@ export const validateLookupTimeZone = (req, res, next) => {
   
   next();
 };
+
+
+// Custom validator for IANA timezone
+const validateIANAZone = (value, helpers) => {
+  const zone = IANAZone.create(value);
+  if (!zone.isValid) {
+    return helpers.error('any.invalid');
+  }
+  return value;
+};
+
+// Schema for /convert endpoint
+export const convertSchema = Joi.object({
+  dateTime: Joi.string()
+    .required()
+    .messages({
+      'string.empty': 'dateTime is required',
+      'any.required': 'dateTime parameter is required'
+    }),
+  fromZone: Joi.string()
+    .custom(validateIANAZone)
+    .messages({
+      'any.invalid': 'fromZone must be a valid IANA timezone identifier'
+    }),
+  toZone: Joi.string()
+    .required()
+    .custom(validateIANAZone)
+    .messages({
+      'string.empty': 'toZone is required',
+      'any.required': 'toZone parameter is required',
+      'any.invalid': 'toZone must be a valid IANA timezone identifier'
+    })
+});
+
+// Schema for /format endpoint
+export const formatSchema = Joi.object({
+  dateTime: Joi.string()
+    .required()
+    .messages({
+      'string.empty': 'dateTime is required',
+      'any.required': 'dateTime parameter is required'
+    }),
+  displayZone: Joi.string()
+    .required()
+    .custom(validateIANAZone)
+    .messages({
+      'string.empty': 'displayZone is required',
+      'any.required': 'displayZone parameter is required', //!displayZone is not mandatory
+      'any.invalid': 'displayZone must be a valid IANA timezone identifier'
+    }),
+  format: Joi.string()
+    .required()
+    .messages({
+      'string.empty': 'format is required',
+      'any.required': 'format parameter is required'
+    }),
+  locale: Joi.string()
+    .pattern(/^[a-z]{2}-[A-Z]{2}$/)
+    .messages({
+      'string.pattern.base': 'locale must be a valid BCP 47 tag (e.g., en-US)'
+    })
+});

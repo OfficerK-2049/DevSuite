@@ -474,10 +474,12 @@ class TimeZoneService {
     sourceInput: dateTime,
     inputInterpretation: ''
   };
-
+ //handle encoding for + offset
+  dateTime = dateTime.replace(/ (\d{2}:\d{2})$/, '+$1');
   // Check if dateTime has explicit offset
   const offsetRegex = /[+-]\d{2}:\d{2}|Z$/;
   const hasExplicitOffset = offsetRegex.test(dateTime);
+  console.log("Datetime : " + dateTime + "has offset" + hasExplicitOffset)
 
   let parsedDateTime;
   let sourceZoneUsed = null;
@@ -486,7 +488,8 @@ class TimeZoneService {
   if (hasExplicitOffset && fromZone) {
     // State A: Has offset + fromZone provided -> Ignore fromZone
     warnings.push('fromZone was provided but ignored because the DateTime string included an explicit offset.');
-    parsedDateTime = DateTime.fromISO(dateTime);
+    parsedDateTime = DateTime.fromISO(dateTime,{strict:false});
+    console.log("DId I enter Parsed0? : ",parsedDateTime)
     audit.inputInterpretation = `Offset provided in string was used to define the moment (UTC: ${parsedDateTime.toUTC().toISO()}).`;
   } else if (hasExplicitOffset && !fromZone) {
     // State B: Has offset, no fromZone -> Use offset
@@ -505,10 +508,9 @@ class TimeZoneService {
       code: 'AMBIGUOUS_DATETIME'
     };
   }
-
-  // Validate parsed DateTime
-  //! shouldn't this be for the input datetime?
-  if (!parsedDateTime.isValid) {
+    // Validate input DateTime
+    if (!parsedDateTime.isValid) {
+      console.log("Parsed : ",parsedDateTime)
     throw {
       statusCode: 400,
       message: `Malformed dateTime: ${parsedDateTime.invalidReason}`,
@@ -523,31 +525,21 @@ class TimeZoneService {
   }
 
   // DST ambiguity check (only for State C with fromZone)
-  //!refactor - confusing
-  if (sourceZoneUsed) {
-    const possibleOffsets = parsedDateTime.zone.offset(parsedDateTime.toMillis());
-    const offsetCount = DateTime.fromMillis(parsedDateTime.toMillis(), { zone: sourceZoneUsed })
-      .set({ hour: parsedDateTime.hour, minute: parsedDateTime.minute })
-      .zone.offset(parsedDateTime.toMillis());
+  if (sourceZoneUsed) { 
+    // This check determines if the local wall time was ambiguous or skipped.
+    const possibleOffsets = parsedDateTime.getPossibleOffsets(); 
     
-    // More accurate DST detection
-    const allPossible = [];
-    const testTime = parsedDateTime.set({ second: 0, millisecond: 0 });
-    
-    // Check hour before and after for ambiguity
-    for (let hourOffset = -1; hourOffset <= 1; hourOffset++) {
-      const test = testTime.plus({ hours: hourOffset });
-      if (test.hour === parsedDateTime.hour && test.minute === parsedDateTime.minute) {
-        allPossible.push(test);
-      }
-    }
+    if (possibleOffsets.length > 1) {
+        warnings.push(`Ambiguous time detected in ${sourceZoneUsed}. The local wall time occurred twice during a DST fall-back. The first instance was selected.`);
+    } 
+    // The most reliable check for "skipped time" is comparing the input string's time against the time Luxon resolved.
+    const inputTimePart = dateTime.split('T')[1]?.substring(0, 5) || '00:00'; // e.g., '14:30'
+    const resolvedTimePart = parsedDateTime.toFormat('HH:mm');
 
-    if (allPossible.length === 2) {
-      warnings.push('Ambiguous time detected (DST fall back). The first occurrence was selected.');
-    } else if (allPossible.length === 0) {
-      warnings.push('Invalid time detected (DST spring forward). Luxon adjusted to the nearest valid time.');
+    if (possibleOffsets.length === 0 || (possibleOffsets.length === 1 && inputTimePart !== resolvedTimePart)) {
+        warnings.push(`Invalid time detected (DST spring forward). Luxon adjusted the time from ${inputTimePart} to ${resolvedTimePart} to find the nearest valid moment.`);
     }
-  }
+}
 
   // Convert to target zone
   const convertedDateTime = parsedDateTime.setZone(toZone);

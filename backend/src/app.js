@@ -56,7 +56,7 @@ app.get('*any',(req,res)=>
 {
     res.status(404).json({
         success:'false',
-        message:'Cannot Find Route!!',
+        message:'Cannot Find that URL!!',
         path:req.originalUrl
     })
 })

@@ -6,8 +6,9 @@ const errorHandler = (err, req, res, next) => {
   // Default error
   let error = {
     success: false,
-    message: 'Internal Server Error',
-    statusCode: 500
+    message: err.message || 'Internal Server Error',
+    code:err.code || "",
+    statusCode: err.statusCode || 500 
   };
 
   // PostgreSQL errors

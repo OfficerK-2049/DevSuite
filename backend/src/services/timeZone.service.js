@@ -479,7 +479,6 @@ class TimeZoneService {
   // Check if dateTime has explicit offset
   const offsetRegex = /[+-]\d{2}:\d{2}|Z$/;
   const hasExplicitOffset = offsetRegex.test(dateTime);
-  console.log("Datetime : " + dateTime + "has offset" + hasExplicitOffset)
 
   let parsedDateTime;
   let sourceZoneUsed = null;

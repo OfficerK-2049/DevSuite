@@ -468,6 +468,7 @@ class TimeZoneService {
       throw new Error(`Error looking up timezone: ${error.message}`);
     }
   }
+
   static async convertTime({ dateTime, fromZone, toZone }) {
   const warnings = [];
   const audit = {
@@ -567,7 +568,7 @@ class TimeZoneService {
     warnings,
     audit
   };
-}
+  }
 
   static async formatTime({ dateTime, displayZone, format, locale }) {
   // Luxon predefined format constants map
@@ -596,7 +597,10 @@ class TimeZoneService {
     'DATETIME_HUGE_WITH_SECONDS': DateTime.DATETIME_HUGE_WITH_SECONDS
   };
 
-  // Parse the input dateTime
+  dateTime = dateTime.replace(/ (\d{2}:\d{2})$/, '+$1');
+
+  format=format.replace(/-/g, ' ');
+
   let parsedDateTime = DateTime.fromISO(dateTime);
 
   // If no offset in dateTime, use displayZone for interpretation
@@ -616,7 +620,6 @@ class TimeZoneService {
     };
   }
 
-  // Apply locale if provided
   if (locale) {
     parsedDateTime = parsedDateTime.setLocale(locale);
   }
@@ -625,11 +628,9 @@ class TimeZoneService {
   let requestedFormat = format;
 
   try {
-    // Check if format is a predefined constant
     if (LUXON_FORMAT_CONSTANTS[format]) {
       formattedTime = parsedDateTime.toLocaleString(LUXON_FORMAT_CONSTANTS[format]);
     } else {
-      // Custom format using toFormat
       formattedTime = parsedDateTime.toFormat(format);
     }
   } catch (error) {
@@ -653,7 +654,7 @@ class TimeZoneService {
       }
     }
   };
-}
+  }
 
 
 }

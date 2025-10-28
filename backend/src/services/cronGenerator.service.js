@@ -32,11 +32,14 @@ class CronService {
     }
   }
 
-  static async previewRuns({ expression, timezone, count = 5, startDate }) {
+  static async previewRuns({ expression, timeZone, count = 5, startDate }) {
+    //TODO add provision for locale
     const warnings = [];
     let moment;
 
     expression=expression.replace(/_/g, ' ');
+     //handle encoding for + offset
+    startDate=startDate?startDate.replace(/ (\d{2}:\d{2})$/, '+$1'):"";
 
     if (startDate) {
       const offsetRegex = /[+-]\d{2}:\d{2}|Z$/;
@@ -44,6 +47,7 @@ class CronService {
     //TODO refactor redundant logic
       if (hasOffset) {
         moment = DateTime.fromISO(startDate);
+        console.log("has offset : ",moment)
         if (!moment.isValid) {
           throw {
             statusCode: 400,
@@ -52,10 +56,10 @@ class CronService {
           };
         }
         // Convert to target timezone
-        moment = moment.setZone(timezone);
+        moment = moment.setZone(timeZone);
       } else {
         // Floating time - interpret in target timezone
-        moment = DateTime.fromISO(startDate, { zone: timezone });
+        moment = DateTime.fromISO(startDate, { zone: timeZone });
         if (!moment.isValid) {
           throw {
             statusCode: 400,
@@ -63,12 +67,12 @@ class CronService {
             code: 'INVALID_START_DATE'
           };
         }
-        warnings.push('Interpreted floating startDate within the specified timezone.');
+        warnings.push('Interpreted floating startDate within the specified timeZone.');
       }
     } else {
       // Default to now in target timezone
-      moment = DateTime.now().setZone(timezone);
-      warnings.push('Defaulted startDate to "now" in the target timezone.');
+      moment = DateTime.now().setZone(timeZone);
+      warnings.push('Defaulted startDate to \"now"\ in the target timezone.');
     }
 
     // Validate and parse cron expression
@@ -76,7 +80,7 @@ class CronService {
     try {
       const options = {
         currentDate: moment.toJSDate(),
-        tz: timezone,
+        tz: timeZone,
         iterator: true
       };
       cronIterator = CronExpressionParser.parse(expression, options);
@@ -93,8 +97,9 @@ class CronService {
     try {
       for (let i = 0; i < count; i++) {
         const nextRun = cronIterator.next();
-        const nextRunDateTime = DateTime.fromJSDate(nextRun.value.toDate(), { zone: timezone });
-        nextRuns.push(nextRunDateTime.toISO());
+        const nextRunDateTime = DateTime.fromJSDate(nextRun.toDate());
+        console.log("Runs : ",nextRunDateTime.setZone(timeZone))
+        nextRuns.push(nextRunDateTime.setZone(timeZone).toLocaleString(DateTime.DATETIME_MED_WITH_WEEKDAY));
       }
     } catch (error) {
       throw {
@@ -107,7 +112,7 @@ class CronService {
     return {
       isValid: true,
       expression,
-      timezone,
+      timeZone,
       nextRuns,
       warnings,
       error: null

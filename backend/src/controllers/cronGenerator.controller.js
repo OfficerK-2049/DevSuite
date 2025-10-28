@@ -13,10 +13,10 @@ class CronController {
 
   static async previewRuns(req, res, next) {
     try {
-      const { expression, timezone, count, startDate } = req.query;
+      const { expression, timeZone, count, startDate } = req.query;
       const result = await CronService.previewRuns({ 
         expression, 
-        timezone, 
+        timeZone, 
         count: count ? parseInt(count) : 5, 
         startDate 
       });

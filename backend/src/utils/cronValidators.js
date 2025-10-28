@@ -24,7 +24,7 @@ export const previewSchema = Joi.object({
       'string.empty': 'expression is required',
       'any.required': 'expression parameter is required'
     }),
-  timezone: Joi.string()
+  timeZone: Joi.string()
     .required()
     .custom(validateIANAZone)
     .messages({

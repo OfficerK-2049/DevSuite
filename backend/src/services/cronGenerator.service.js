@@ -1,14 +1,19 @@
-import cronstrue from 'cronstrue';
+import cronstrue from 'cronstrue/i18n.js';
 import { CronExpressionParser } from 'cron-parser';
 import { DateTime } from 'luxon';
 
 class CronService {
   static async translateExpression({ expression, locale }) {
+    let warnings=[]
     try {
+        expression=expression.replace(/_/g, ' ');
+
         //validation
       CronExpressionParser.parse(expression);
 
-      const options = locale ? { locale } : {};
+    //TODO add warnings as only some locales are supported
+      const options = locale ? { locale } : {}; 
+    //   console.log(options)
       const humanReadable = cronstrue.toString(expression, options);
 
       return {
@@ -30,6 +35,8 @@ class CronService {
   static async previewRuns({ expression, timezone, count = 5, startDate }) {
     const warnings = [];
     let moment;
+
+    expression=expression.replace(/_/g, ' ');
 
     if (startDate) {
       const offsetRegex = /[+-]\d{2}:\d{2}|Z$/;

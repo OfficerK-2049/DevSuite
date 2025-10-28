@@ -1,5 +1,5 @@
 import Joi from 'joi';
-
+import { validateIANAZone } from './timeValidators.js';
 
 // Schema for /translate endpoint
 export const translateSchema = Joi.object({

@@ -54,7 +54,7 @@ export const validateLookupTimeZone = (req, res, next) => {
 
 
 // Custom validator for IANA timezone
-const validateIANAZone = (value, helpers) => {
+export const validateIANAZone = (value, helpers) => {
   const zone = IANAZone.create(value);
   if (!zone.isValid) {
     return helpers.error('any.invalid');
